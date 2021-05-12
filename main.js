@@ -1,8 +1,9 @@
 var http = require('http');
 var fs = require('fs');
 var url = require('url'); //url이라는 모듈을 사용할 것이다. 
+var qs = require('querystring');
 
-function templateHTML(title, list, body) {
+function templateHTML(title, list, body, control) {
   return `
   <!doctype html>
   <html>
@@ -13,7 +14,7 @@ function templateHTML(title, list, body) {
   <body>
     <h1><a href="/">WEB</a></h1>
     ${list}
-    <a href="/create">create</a>
+    ${control}
     ${body}
   </body>
   </html>
@@ -51,7 +52,7 @@ var app = http.createServer(function (request, response) {
         var description = 'Hello, Node.js'
         var list = templateList(filelist);
         var template = templateHTML(title, list, `<h2>${title}</h2>
-         ${description}`);
+         ${description}`, `<a href="/create">create</a>`);
         response.writeHead(200);
         response.end(template);
 
@@ -65,7 +66,8 @@ var app = http.createServer(function (request, response) {
           var title = queryData.id;
           var list = templateList(filelist);
           var template = templateHTML(title, list, `<h2>${title}</h2>
-          ${description}`);
+          ${description}`,
+          `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`);
           response.writeHead(200);
           response.end(template);
         });
@@ -86,7 +88,7 @@ var app = http.createServer(function (request, response) {
         <p>
         <input type="submit">
         </p>
-        </form>`);
+        </form>`,'');
       response.writeHead(200);
       response.end(template);
 
@@ -97,16 +99,49 @@ var app = http.createServer(function (request, response) {
   } else if(pathname === '/create_process'){
     var body = '';
     request.on('data', function(data){
+        //웹브라우저가 post방식으로 데이터를 전송할 때 엄청 많으면 데이터 한번에 처리하다보면 무리하면 컴터 꺼짐 그거에 대비해서 요렇게 사용방법을 제공
+        body = body + data;
+    });
+    request.on('end', function(){
+      var post = qs.parse(body);
+      //쿼리스트링이라는 모듈의 parse를 객체화 할 수 있다
+      var title = post.title;
+      var description = post.description;
+      fs.writeFile(`data/${title}`, description, 'utf8', function(err){
+        response.writeHead(302, {Location: `/id=${title}`}); //200은 성공 302는 다른 페이지로 리다이렉션
+        response.end('success');
+      })
 
     });
-    request.on('end', function(data){
+    
 
+
+  }else if(pathname === '/update'){
+    fs.readdir('./data', function (err, filelist) {
+
+      fs.readFile(`data/${queryData.id}`, 'utf8', function (err, description) {
+        var title = queryData.id;
+        var list = templateList(filelist);
+        var template = templateHTML(title, list,
+        `
+        <form action="/update_process" method="post">
+        <p><input type="text" name="title" placeholder="title" value="${title}"></p>
+        <p>
+        <textarea name="description" placeholder="description">${description}</textarea>
+        </p>
+        <p>
+        <input type="submit">
+        </p>
+        </form>
+        
+        `,
+        `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`);
+        response.writeHead(200);
+        response.end(template);
+      });
     });
-    response.writeHead(200);
-    response.end('success');
 
-
-  }else {
+  } else {
     response.writeHead(404);
     response.end('Not found');
   }
