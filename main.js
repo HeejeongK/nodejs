@@ -3,6 +3,8 @@ var fs = require('fs');
 var url = require('url'); //url이라는 모듈을 사용할 것이다. 
 var qs = require('querystring');
 
+
+
 function templateHTML(title, list, body, control) {
   return `
   <!doctype html>
@@ -56,7 +58,7 @@ var app = http.createServer(function (request, response) {
         response.writeHead(200);
         response.end(template);
 
-      })
+      });
 
 
     } else {
@@ -67,7 +69,13 @@ var app = http.createServer(function (request, response) {
           var list = templateList(filelist);
           var template = templateHTML(title, list, `<h2>${title}</h2>
           ${description}`,
-          `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`);
+          ` <a href="/create">create</a> 
+            <a href="/update?id=${title}">update</a>
+           <form action="delete_process" method="post" >
+            <input type="hidden" name="id" value="${title}">
+            <input type="submit" value="delete">
+           </form>`
+          );
           response.writeHead(200);
           response.end(template);
         });
@@ -80,7 +88,7 @@ var app = http.createServer(function (request, response) {
 
       var list = templateList(filelist);
       var template = templateHTML(title, list, `
-        <form action="http://localhost:5000/create_process" method="post">
+        <form action="/create_process" method="post">
         <p><input type="text" name="title" placeholder="title"></p>
         <p>
         <textarea name="description" placeholder="description"></textarea>
@@ -94,8 +102,6 @@ var app = http.createServer(function (request, response) {
 
     });
     
-
-
   } else if(pathname === '/create_process'){
     var body = '';
     request.on('data', function(data){
@@ -105,26 +111,28 @@ var app = http.createServer(function (request, response) {
     request.on('end', function(){
       var post = qs.parse(body);
       //쿼리스트링이라는 모듈의 parse를 객체화 할 수 있다
+    
       var title = post.title;
       var description = post.description;
-      fs.writeFile(`data/${title}`, description, 'utf8', function(err){
-        response.writeHead(302, {Location: `/id=${title}`}); //200은 성공 302는 다른 페이지로 리다이렉션
-        response.end('success');
+      
+        fs.writeFile(`data/${title}`, description, 'utf8', function(err){
+          response.writeHead(302, {Location: `/?id=${title}`}); //200은 성공 302는 다른 페이지로 리다이렉션
+          response.end();
       })
-
-    });
+           
+        
+    }); 
     
-
 
   }else if(pathname === '/update'){
     fs.readdir('./data', function (err, filelist) {
-
       fs.readFile(`data/${queryData.id}`, 'utf8', function (err, description) {
         var title = queryData.id;
         var list = templateList(filelist);
         var template = templateHTML(title, list,
         `
         <form action="/update_process" method="post">
+        <input type="hidden" name="id" value="${title}">
         <p><input type="text" name="title" placeholder="title" value="${title}"></p>
         <p>
         <textarea name="description" placeholder="description">${description}</textarea>
@@ -140,8 +148,41 @@ var app = http.createServer(function (request, response) {
         response.end(template);
       });
     });
+  } else if(pathname === '/update_process'){
+    var body = '';
+    request.on('data', function(data){
+        body = body + data;
+    });
+    request.on('end', function(){
+      var post = qs.parse(body);
+      var id = post.id;
+      var title = post.title;
+      var description = post.description;
+      //console.log(post);
+       fs.rename(`data/${id}`, `data/${title}`, function(error){
+        fs.writeFile(`data/${title}`, description, 'utf8', function(err){
+          response.writeHead(302, {Location: `/?id=${title}`}); //200은 성공 302는 다른 페이지로 리다이렉션
+          response.end();
+        }); 
+      });        
+    });
 
-  } else {
+  } else if(pathname === '/delete_process'){
+    var body = '';
+    request.on('data', function(data){
+        body = body + data;
+    });
+    request.on('end', function(){
+      var post = qs.parse(body);
+      var id = post.id;
+      fs.unlink(`data/${id}`, function(error){
+        response.writeHead(302, {location: `/`});
+        response.end();
+      });
+         
+    });
+
+  }else {
     response.writeHead(404);
     response.end('Not found');
   }
@@ -150,4 +191,4 @@ var app = http.createServer(function (request, response) {
   //response.end(fs.readFileSync(__dirname + _url));
 
 });
-app.listen(5000);
+app.listen(5050);
