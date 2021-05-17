@@ -2,8 +2,12 @@ var http = require('http');
 var fs = require('fs');
 var url = require('url'); //url이라는 모듈을 사용할 것이다. 
 var qs = require('querystring');
+var template = require('./lib/template.js');
+var path = require('path');
+var sanitizeHTML = require('sanitize-html');
 
-var template = {
+//아래 template을 모듈로 빼고 (lib/template.js) 받아서 활용~
+/* var template = {
   HTML: function(title, list, body, control) {
     return `
     <!doctype html>
@@ -18,8 +22,7 @@ var template = {
       ${control}
       ${body}
     </body>
-    </html>
-    
+    </html>   
        ` ; 
   }, List:function(filelist){
     var list = '<ul>';
@@ -28,13 +31,10 @@ var template = {
       list = list + `<li><a href= "/?id=${filelist[i]}">${filelist[i]}</a></li>`;
       i = i + 1;
     }
-  
     list = list + '</ul>';
     return list;
   }
-  }
-
-
+  } */
 
 /* function templateHTML(title, list, body, control) {
   return `
@@ -50,12 +50,9 @@ var template = {
     ${control}
     ${body}
   </body>
-  </html>
-  
+  </html> 
      ` ;
-
 }
-
 function templateList(filelist) {
   var list = '<ul>';
   var i = 0;
@@ -63,7 +60,6 @@ function templateList(filelist) {
     list = list + `<li><a href= "/?id=${filelist[i]}">${filelist[i]}</a></li>`;
     i = i + 1;
   }
-
   list = list + '</ul>';
   return list;
 } */
@@ -90,29 +86,27 @@ var app = http.createServer(function (request, response) {
         response.writeHead(200);
         response.end(template);  원래 코드 아래 코드는 함수 이용해서 변경*/
 
-
         var list = template.List(filelist);
         var html = template.HTML(title, list,
            `<h2>${title}</h2> ${description}`,
            `<a href="/create">create</a>`);
         response.writeHead(200);
         response.end(html);
-
       });
-
-
     } else {
       fs.readdir('./data', function (err, filelist) {
-
-        fs.readFile(`data/${queryData.id}`, 'utf8', function (err, description) {
+        var filteredId = path.parse(queryData.id).base;
+        fs.readFile(`data/${filteredId}`, 'utf8', function (err, description) {
           var title = queryData.id;
+          var sanitizedTitle = sanitizeHTML(title);
+          var sanitizedDescription = sanitizeHTML(description);
           var list = template.List(filelist);
-          var html = template.HTML(title, list, `<h2>${title}</h2>
-          ${description}`,
+          var html = template.HTML(sanitizedTitle, list, 
+            `<h2>${sanitizedTitle}</h2> ${sanitizedDescription}`,
           ` <a href="/create">create</a> 
-            <a href="/update?id=${title}">update</a>
+            <a href="/update?id=${sanitizedTitle}">update</a>
            <form action="delete_process" method="post" >
-            <input type="hidden" name="id" value="${title}">
+            <input type="hidden" name="id" value="${sanitizedTitle}">
             <input type="submit" value="delete">
            </form>`
           );
@@ -139,7 +133,6 @@ var app = http.createServer(function (request, response) {
         </form>`,'');
       response.writeHead(200);
       response.end(html);
-
     });
     
   } else if(pathname === '/create_process'){
@@ -158,15 +151,13 @@ var app = http.createServer(function (request, response) {
         fs.writeFile(`data/${title}`, description, 'utf8', function(err){
           response.writeHead(302, {Location: `/?id=${title}`}); //200은 성공 302는 다른 페이지로 리다이렉션
           response.end();
-      })
-           
-        
+      })        
     }); 
     
-
   }else if(pathname === '/update'){
     fs.readdir('./data', function (err, filelist) {
-      fs.readFile(`data/${queryData.id}`, 'utf8', function (err, description) {
+      var filteredId = path.parse(queryData.id).base;
+      fs.readFile(`data/${filteredId}`, 'utf8', function (err, description) {
         var title = queryData.id;
         var list = template.List(filelist);
         var html = template.HTML(title, list,
@@ -180,8 +171,7 @@ var app = http.createServer(function (request, response) {
         <p>
         <input type="submit">
         </p>
-        </form>
-        
+        </form> 
         `,
         `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`);
         response.writeHead(200);
@@ -215,20 +205,19 @@ var app = http.createServer(function (request, response) {
     request.on('end', function(){
       var post = qs.parse(body);
       var id = post.id;
-      fs.unlink(`data/${id}`, function(error){
+      var filteredId = path.parse(id).base;
+      
+      fs.unlink(`data/${filteredId}`, function(error){
         response.writeHead(302, {location: `/`});
         response.end();
-      });
-         
+      });       
     });
 
   }else {
     response.writeHead(404);
     response.end('Not found');
   }
-
   //console.log(__dirname + url);
   //response.end(fs.readFileSync(__dirname + _url));
-
 });
 app.listen(5050);
